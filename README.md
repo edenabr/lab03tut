@@ -1,193 +1,280 @@
-## Laboratory work III
+# Lab03 Tutorial
 
-Данная лабораторная работа посвещена изучению систем автоматизации сборки проекта на примере **CMake**
+## 1. Настройка Git
 
-```sh
-$ open https://cmake.org/
+```bash
+git config --global user.name "edenabr"
+git config --global user.email "edenabramova@gmail.com"
 ```
 
-## Tasks
+Данными командами задаётся имя пользователя и электронная почта для Git.
 
-- [ ] 1. Создать публичный репозиторий с названием **lab03** на сервисе **GitHub**
-- [ ] 2. Ознакомиться со ссылками учебного материала
-- [ ] 3. Выполнить инструкцию учебного материала
-- [ ] 4. Составить отчет и отправить ссылку личным сообщением в **Slack**
+---
 
-## Tutorial
+## 2. Переход в директорию проекта
 
-```sh
-$ export GITHUB_USERNAME=<имя_пользователя>
+```bash
+cd "/home/vboxuser/Рабочий стол/project/projects/lab03"
+```
+---
+## 3. Исправление ошибки совместимости с компилятором
+
+```bash
+sed -i 's/std::sqrtf/std::sqrt/g' solver_lib/solver.cpp
 ```
 
-```sh
-$ cd ${GITHUB_USERNAME}/workspace
-$ pushd .
-$ source scripts/activate
+В файле `solver_lib/solver.cpp` функция `std::sqrtf` была заменена на `std::sqrt`, так как используемый компилятор не находил `std::sqrtf`.
+
+```bash
+grep -q '#include <cmath>' solver_lib/solver.cpp || sed -i '1i #include <cmath>' solver_lib/solver.cpp
 ```
 
-```sh
-$ git clone https://github.com/${GITHUB_USERNAME}/lab02.git projects/lab03
-$ cd projects/lab03
-$ git remote remove origin
-$ git remote add origin https://github.com/${GITHUB_USERNAME}/lab03.git
-```
+Данная команда проверяет, подключена ли библиотека `<cmath>`.
+Если строки `#include <cmath>` нет, она добавляется в начало файла. Эта библиотека нужна для использования функции `std::sqrt`.
 
-```sh
-$ g++ -std=c++11 -I./include -c sources/print.cpp
-$ ls print.o
-$ nm print.o | grep print
-$ ar rvs print.a print.o
-$ file print.a
-$ g++ -std=c++11 -I./include -c examples/example1.cpp
-$ ls example1.o
-$ g++ example1.o print.a -o example1
-$ ./example1 && echo
-```
+---
 
-```sh
-$ g++ -std=c++11 -I./include -c examples/example2.cpp
-$ nm example2.o
-$ g++ example2.o print.a -o example2
-$ ./example2
-$ cat log.txt && echo
-```
+## 4. Создание файла CMakeLists.txt
 
-```sh
-$ rm -rf example1.o example2.o print.o
-$ rm -rf print.a
-$ rm -rf example1 example2
-$ rm -rf log.txt
-```
+```bash
+cat > CMakeLists.txt <<'EOF'
+cmake_minimum_required(VERSION 3.10)
 
-```sh
-$ cat > CMakeLists.txt <<EOF
-cmake_minimum_required(VERSION 3.4)
-project(print)
-EOF
-```
+project(lab03)
 
-```sh
-$ cat >> CMakeLists.txt <<EOF
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_library(formatter STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/formatter_lib/formatter.cpp
+)
+
+target_include_directories(formatter PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/formatter_lib
+)
+
+add_library(formatter_ex STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/formatter_ex_lib/formatter_ex.cpp
+)
+
+target_include_directories(formatter_ex PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/formatter_ex_lib
+)
+
+target_link_libraries(formatter_ex PUBLIC formatter)
+
+add_library(solver STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/solver_lib/solver.cpp
+)
+
+target_include_directories(solver PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/solver_lib
+)
+
+add_executable(hello_world
+    ${CMAKE_CURRENT_SOURCE_DIR}/hello_world_application/hello_world.cpp
+)
+
+target_link_libraries(hello_world formatter_ex)
+
+add_executable(equation
+    ${CMAKE_CURRENT_SOURCE_DIR}/solver_application/equation.cpp
+)
+
+target_link_libraries(equation solver formatter_ex)
+
+install(TARGETS formatter formatter_ex solver hello_world equation
+    RUNTIME DESTINATION bin
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+)
+
+install(DIRECTORY formatter_lib/
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.h"
+)
+
+install(DIRECTORY formatter_ex_lib/
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.h"
+)
+
+install(DIRECTORY solver_lib/
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.h"
+)
 EOF
 ```
 
+
+---
+
+## 5. Очистка старых файлов сборки
+
+```bash
+rm -rf _build _install
+```
+---
+
+## 6. Конфигурация проекта через CMake
+
+```bash
+cmake -H. -B_build -DCMAKE_INSTALL_PREFIX=_install
+```
+---
+
+## 7. Сборка проекта
+
+```bash
+cmake --build _build
+```
+В результате были собраны:
+
+```text
+libformatter.a
+libformatter_ex.a
+libsolver.a
+hello_world
+equation
+```
+
+<details>
+<summary>Сборка проекта</summary>
+<pre>
+-- The C compiler identification is GNU 15.2.0
+-- The CXX compiler identification is GNU 15.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done (0.2s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/vboxuser/Рабочий стол/project/projects/lab03/_build
+[ 10%] Building CXX object CMakeFiles/formatter.dir/formatter_lib/formatter.cpp.o
+[ 20%] Linking CXX static library libformatter.a
+[ 20%] Built target formatter
+[ 30%] Building CXX object CMakeFiles/formatter_ex.dir/formatter_ex_lib/formatter_ex.cpp.o
+[ 40%] Linking CXX static library libformatter_ex.a
+[ 40%] Built target formatter_ex
+[ 50%] Building CXX object CMakeFiles/solver.dir/solver_lib/solver.cpp.o
+[ 60%] Linking CXX static library libsolver.a
+[ 60%] Built target solver
+[ 70%] Building CXX object CMakeFiles/hello_world.dir/hello_world_application/hello_world.cpp.o
+[ 80%] Linking CXX executable hello_world
+[ 80%] Built target hello_world
+[ 90%] Building CXX object CMakeFiles/equation.dir/solver_application/equation.cpp.o
+[100%] Linking CXX executable equation
+[100%] Built target equation</pre>
+</details>
+
+---
+
+## 8. Проверка работы программы hello_world
+
+```bash
+_build/hello_world
+```
+
+Команда запускает собранную программу `hello_world`.
+
+---
+
+## 9. Проверка работы программы equation
+
+```bash
+echo "1 2 1" | _build/equation
+```
 ```sh
-$ cat >> CMakeLists.txt <<EOF
-add_library(print STATIC \${CMAKE_CURRENT_SOURCE_DIR}/sources/print.cpp)
-EOF
+-------------------------
+x1 = -1.000000
+-------------------------
+-------------------------
+x2 = -1.000000
+-------------------------
+```
+---
+
+## 10. Установка проекта +
+Просмотр структуры установленного проекта
+```bash
+cmake --build _build --target install
+tree _install
 ```
 
-```sh
-$ cat >> CMakeLists.txt <<EOF
-include_directories(\${CMAKE_CURRENT_SOURCE_DIR}/include)
-EOF
+<details>
+<summary>Название команды</summary>
+<pre>
+[ 20%] Built target formatter
+[ 40%] Built target formatter_ex
+[ 60%] Built target solver
+[ 80%] Built target hello_world
+[100%] Built target equation
+Install the project...
+-- Install configuration: ""
+-- Installing: /home/vboxuser/Рабочий стол/project/projects/lab03/_install/lib/libformatter.a
+-- Installing: /home/vboxuser/Рабочий стол/project/projects/lab03/_install/lib/libformatter_ex.a
+-- Installing: /home/vboxuser/Рабочий стол/project/projects/lab03/_install/lib/libsolver.a
+-- Installing: /home/vboxuser/Рабочий стол/project/projects/lab03/_install/bin/hello_world
+-- Installing: /home/vboxuser/Рабочий стол/project/projects/lab03/_install/bin/equation
+-- Installing: /home/vboxuser/Рабочий стол/project/projects/lab03/_install/include
+-- Installing: /home/vboxuser/Рабочий стол/project/projects/lab03/_install/include/formatter.h
+-- Up-to-date: /home/vboxuser/Рабочий стол/project/projects/lab03/_install/include
+-- Installing: /home/vboxuser/Рабочий стол/project/projects/lab03/_install/include/formatter_ex.h
+-- Up-to-date: /home/vboxuser/Рабочий стол/project/projects/lab03/_install/include
+-- Installing: /home/vboxuser/Рабочий стол/project/projects/lab03/_install/include/solver.h
+_install
+├── bin
+│   ├── equation
+│   └── hello_world
+├── include
+│   ├── formatter_ex.h
+│   ├── formatter.h
+│   └── solver.h
+└── lib
+    ├── libformatter.a
+    ├── libformatter_ex.a
+    └── libsolver.a
+
+4 directories, 8 files</pre>
+</details>
+
+---
+
+## 11. Проверка состояния репозитория
+
+```bash
+git status
+```
+---
+
+
+## 12. Создание коммита
+
+```bash
+git commit -m "added CMakeLists.txt"
 ```
 
-```sh
-$ cmake -H. -B_build
-$ cmake --build _build
+---
+
+## 13. Переименование ветки в main
+
+```bash
+git branch -M main
+```
+---
+
+## 14. Отправка изменений на GitHub
+
+```bash
+git push -u origin main
 ```
 
-```sh
-$ cat >> CMakeLists.txt <<EOF
+## Итог
 
-add_executable(example1 \${CMAKE_CURRENT_SOURCE_DIR}/examples/example1.cpp)
-add_executable(example2 \${CMAKE_CURRENT_SOURCE_DIR}/examples/example2.cpp)
-EOF
-```
-
-```sh
-$ cat >> CMakeLists.txt <<EOF
-
-target_link_libraries(example1 print)
-target_link_libraries(example2 print)
-EOF
-```
-
-```sh
-$ cmake --build _build
-$ cmake --build _build --target print
-$ cmake --build _build --target example1
-$ cmake --build _build --target example2
-```
-
-```sh
-$ ls -la _build/libprint.a
-$ _build/example1 && echo
-hello
-$ _build/example2
-$ cat log.txt && echo
-hello
-$ rm -rf log.txt
-```
-
-```sh
-$ git clone https://github.com/tp-labs/lab03 tmp
-$ mv -f tmp/CMakeLists.txt .
-$ rm -rf tmp
-```
-
-```sh
-$ cat CMakeLists.txt
-$ cmake -H. -B_build -DCMAKE_INSTALL_PREFIX=_install
-$ cmake --build _build --target install
-$ tree _install
-```
-
-```sh
-$ git add CMakeLists.txt
-$ git commit -m"added CMakeLists.txt"
-$ git push origin master
-```
-
-## Report
-
-```sh
-$ popd
-$ export LAB_NUMBER=03
-$ git clone https://github.com/tp-labs/lab${LAB_NUMBER} tasks/lab${LAB_NUMBER}
-$ mkdir reports/lab${LAB_NUMBER}
-$ cp tasks/lab${LAB_NUMBER}/README.md reports/lab${LAB_NUMBER}/REPORT.md
-$ cd reports/lab${LAB_NUMBER}
-$ edit REPORT.md
-$ gist REPORT.md
-```
-
-## Homework
-
-Представьте, что вы стажер в компании "Formatter Inc.".
-### Задание 1
-Вам поручили перейти на систему автоматизированной сборки **CMake**.
-Исходные файлы находятся в директории [formatter_lib](formatter_lib).
-В этой директории находятся файлы для статической библиотеки *formatter*.
-Создайте `CMakeList.txt` в директории [formatter_lib](formatter_lib),
-с помощью которого можно будет собирать статическую библиотеку *formatter*.
-
-### Задание 2
-У компании "Formatter Inc." есть перспективная библиотека,
-которая является расширением предыдущей библиотеки. Т.к. вы уже овладели
-навыком созданием `CMakeList.txt` для статической библиотеки *formatter*, ваш 
-руководитель поручает заняться созданием `CMakeList.txt` для библиотеки 
-*formatter_ex*, которая в свою очередь использует библиотеку *formatter*.
-
-### Задание 3
-Конечно же ваша компания предоставляет примеры использования своих библиотек.
-Чтобы продемонстрировать как работать с библиотекой *formatter_ex*,
-вам необходимо создать два `CMakeList.txt` для двух простых приложений:
-* *hello_world*, которое использует библиотеку *formatter_ex*;
-* *solver*, приложение которое испольует статические библиотеки *formatter_ex* и *solver_lib*.
-
-**Удачной стажировки!**
-
-## Links
-- [Основы сборки проектов на С/C++ при помощи CMake](https://eax.me/cmake/)
-- [CMake Tutorial](http://neerc.ifmo.ru/wiki/index.php?title=CMake_Tutorial)
-- [C++ Tutorial - make & CMake](https://www.bogotobogo.com/cplusplus/make.php)
-- [Autotools](http://www.gnu.org/software/automake/manual/html_node/Autotools-Introduction.html)
-- [CMake](https://cgold.readthedocs.io/en/latest/index.html)
-
-```
-Copyright (c) 2015-2021 The ISC Authors
-```
+В ходе выполнения tutorial был создан файл `CMakeLists.txt`, описывающий сборку проекта через CMake. Были добавлены статические библиотеки `formatter`, `formatter_ex`, `solver`, а также исполняемые файлы `hello_world` и `equation`.
